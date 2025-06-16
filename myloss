@@ -1,0 +1,92 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class CustomCrossEntropyLoss(nn.Module):
+    def __init__(self):
+        super(CustomCrossEntropyLoss,self).__init__()
+
+    def forward(self,input,target):
+        input1 = input[:,0,:,:].unsqueeze(1)
+        input2 = input[:,1,:,:].unsqueeze(1)
+        loss1 = F.binary_cross_entropy_with_logits(input1, target)
+        loss2 = F.binary_cross_entropy_with_logits(input2, 1 - target)
+        return loss1 + loss2
+def compute_kl_loss(p_logits, q_logits):
+
+    p_logits = p_logits.to('cuda')
+    q_logits = q_logits.to('cuda')
+
+    p = F.log_softmax(p_logits, dim=-1, dtype=torch.float32)
+    p_tec = F.softmax(p_logits, dim=-1, dtype=torch.float32)
+    q = F.log_softmax(q_logits, dim=-1, dtype=torch.float32)
+    q_tec = F.softmax(q_logits, dim=-1, dtype=torch.float32)
+
+    p_loss = F.kl_div(p, q_tec, reduction='none').sum()
+    q_loss = F.kl_div(q, p_tec, reduction='none').sum()
+    loss = q_loss * 0.02
+    return loss
+def compute_kl_loss1(p_logits, q_logits):
+    p_logits = p_logits.to('cuda')
+    q_logits = q_logits.to('cuda')
+    p = F.log_softmax(p_logits, dim=1)
+    q = F.softmax(q_logits, dim=1)
+    kl_loss = F.kl_div(p, q, reduction='none').sum(dim=(1, 2, 3))
+    loss = kl_loss.mean() * 0.005
+    return loss
+class CosineSimilarityLoss2(nn.Module):
+
+    def forward(self, input1, input2, target):
+        target = (target > 0.5).float()
+        one = torch.sum(target, dim=(2, 3))
+        zero = 65536 - one
+        one_safe = torch.clamp(one,min=1)
+        zero_safe = torch.clamp(zero, min=1)
+        change = input1 * target
+        prototype_change = change.sum(dim=(2, 3))
+        prototype_change = prototype_change.view(-1, prototype_change.shape[1], 1, 1)
+        prototype_change = prototype_change / one_safe.unsqueeze(-1).unsqueeze(-1)
+        prototype_change_256 = prototype_change.expand(-1, -1, 256, 256)
+        prototype_change_256 = prototype_change_256 * target
+        loss_change = torch.mean(torch.abs(input1-prototype_change_256))
+
+        nonchange = input2 * (1 - target)
+        prototype_nonchange = nonchange.sum(dim=(2, 3))
+        prototype_nonchange = prototype_nonchange.view(-1, prototype_nonchange.shape[1], 1, 1)
+        prototype_nonchange = prototype_nonchange / zero_safe.unsqueeze(-1).unsqueeze(-1)
+        prototype_nonchange_256 = prototype_nonchange.expand(-1, -1, 256, 256)
+        prototype_nonchange_256 = prototype_nonchange_256 * (1 - target)
+        loss_nonchange = torch.mean(torch.abs(input2-prototype_nonchange_256))
+        loss = loss_change + loss_nonchange
+        return torch.exp(loss)
+class MyEntropyLoss(nn.Module):
+    def __init__(self):
+        super(MyEntropyLoss, self).__init__()
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, outputs, labels):
+
+        outputs = self.softmax(outputs)
+        outputs = outputs[:, 1:2, :, :]
+        nc = torch.sum((labels == 1).float())
+        nu = torch.sum((labels == 0).float())
+        loss1 = 0
+        loss2 = 0
+        if nc != 0:
+            loss1 = torch.sum(labels * torch.clamp(1 - outputs, min=0.0)) / nc
+        if nu != 0:
+            loss2 = torch.sum((1 - labels) * torch.clamp(outputs-0, min=0.0)) / nu
+        loss = loss1 + loss2
+        return loss
+class CombinedLoss(nn.Module):
+    def __init__(self):
+        super(CombinedLoss, self).__init__()
+    def forward(self, input, target, weight=None, reduction='mean',ignore_index=255):
+        target = target.long()
+        if target.dim() == 4:
+            target = torch.squeeze(target, dim=1)
+        if input.shape[-1] != target.shape[-1]:
+            input = F.interpolate(input, size=target.shape[1:], mode='bilinear',align_corners=True)
+
+        return F.cross_entropy(input=input, target=target, weight=weight,
+                               ignore_index=ignore_index, reduction=reduction)
