@@ -1,0 +1,16 @@
+================ (Thu Dec 12 14:13:22 2024) ================
+加载最后一个检查点...
+Eval Historical_best_f1 = 0.8373 (at epoch 7)
+
+开始 evaluation...
+Is_training: False. [1,45],  running_mf1: 0.90114
+acc: 0.97387 miou: 0.75473 mf1: 0.84230 iou_0: 0.97306 iou_1: 0.53640 F1_0: 0.98635 F1_1: 0.69825 precision_0: 0.98987 precision_1: 0.64736 recall_0: 0.98285 recall_1: 0.75783 
+
+================ (Fri Dec 13 00:47:20 2024) ================
+加载最后一个检查点...
+Eval Historical_best_f1 = 0.8741 (at epoch 69)
+
+开始 evaluation...
+Is_training: False. [1,45],  running_mf1: 0.88757
+acc: 0.98091 miou: 0.81331 mf1: 0.88762 iou_0: 0.98022 iou_1: 0.64639 F1_0: 0.99001 F1_1: 0.78522 precision_0: 0.99475 precision_1: 0.71227 recall_0: 0.98532 recall_1: 0.87483 
+
